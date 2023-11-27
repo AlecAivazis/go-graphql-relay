@@ -14,15 +14,13 @@ import (
 func New() (*Client, error) {
 	// build up the connection string
 	// Example: root:@tcp(localhost:3306)/test
-	hostString := projectConfig.DbUser +
-		":" +
-		projectConfig.DbPassword +
-		"@tcp(" +
-		projectConfig.DbHost +
-		":" +
-		fmt.Sprintf("%d", projectConfig.DbPort) +
-		")/" +
-		projectConfig.DbName
+	hostString := fmt.Sprintf("%s:%s@tcp(%s:%v)/%s",
+		projectConfig.DbUser,
+		projectConfig.DbPassword,
+		projectConfig.DbHost,
+		projectConfig.DbPort,
+		projectConfig.DbName,
+	)
 
 	// Open new connection
 	db, err := sql.Open("mysql", hostString)
@@ -34,7 +32,7 @@ func New() (*Client, error) {
 	db.DB().SetMaxOpenConns(50)
 
 	// Create an ent.Driver from `db`.
-	drv := entsql.OpenDB(dialect.Postgres, db.DB())
+	drv := entsql.OpenDB(dialect.MySQL, db.DB())
 
 	// create the client with our configured driver
 	return NewClient(Driver(drv)), nil

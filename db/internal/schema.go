@@ -6,4 +6,4 @@
 // Package internal holds a loadable version of the latest schema.
 package internal
 
-const Schema = `{"Schema":"projectname/db/schema","Package":"projectname/db","Schemas":[{"name":"User","config":{"Table":""}}],"Features":["schema/snapshot","sql/upsert","intercept","namedges"]}`
+const Schema = `{"Schema":"projectname/db/schema","Package":"projectname/db","Schemas":[{"name":"User","config":{"Table":""},"fields":[{"name":"name","type":{"Type":7,"Ident":"","PkgPath":"","PkgName":"","Nillable":false,"RType":null},"unique":true,"validators":1,"position":{"Index":0,"MixedIn":false,"MixinIndex":0}}]}],"Features":["schema/snapshot","sql/upsert","intercept","namedges"]}`

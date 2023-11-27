@@ -6,9 +6,9 @@ import (
 )
 
 var DbHost = "localhost"
-var DbPort = 5432
-var DbName = "development"
-var DbUser = "ent"
+var DbPort = 3306
+var DbName = "ProjectName"
+var DbUser = "root"
 var DbPassword = "password"
 var DbEnableSSL = false
 

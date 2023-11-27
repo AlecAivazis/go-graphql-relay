@@ -52,7 +52,8 @@ type ComplexityRoot struct {
 	}
 
 	User struct {
-		ID func(childComplexity int) int
+		ID   func(childComplexity int) int
+		Name func(childComplexity int) int
 	}
 }
 
@@ -133,6 +134,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.User.ID(childComplexity), true
+
+	case "User.name":
+		if e.complexity.User.Name == nil {
+			break
+		}
+
+		return e.complexity.User.Name(childComplexity), true
 
 	}
 	return 0, false
@@ -275,6 +283,7 @@ type Query {
 }
 type User implements Node {
   id: ID!
+  name: String!
 }
 """
 UserWhereInput is used for filtering User objects.
@@ -293,6 +302,20 @@ input UserWhereInput {
   idGTE: ID
   idLT: ID
   idLTE: ID
+  """name field predicates"""
+  name: String
+  nameNEQ: String
+  nameIn: [String!]
+  nameNotIn: [String!]
+  nameGT: String
+  nameGTE: String
+  nameLT: String
+  nameLTE: String
+  nameContains: String
+  nameHasPrefix: String
+  nameHasSuffix: String
+  nameEqualFold: String
+  nameContainsFold: String
 }
 `, BuiltIn: false},
 }

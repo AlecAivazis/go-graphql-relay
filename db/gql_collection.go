@@ -4,6 +4,7 @@ package db
 
 import (
 	"context"
+	"projectname/db/user"
 
 	"entgo.io/ent/dialect/sql"
 	"github.com/99designs/gqlgen/graphql"
@@ -23,6 +24,27 @@ func (u *UserQuery) CollectFields(ctx context.Context, satisfies ...string) (*Us
 
 func (u *UserQuery) collectField(ctx context.Context, opCtx *graphql.OperationContext, collected graphql.CollectedField, path []string, satisfies ...string) error {
 	path = append([]string(nil), path...)
+	var (
+		unknownSeen    bool
+		fieldSeen      = make(map[string]struct{}, len(user.Columns))
+		selectedFields = []string{user.FieldID}
+	)
+	for _, field := range graphql.CollectFields(opCtx, collected.Selections, satisfies) {
+		switch field.Name {
+		case "name":
+			if _, ok := fieldSeen[user.FieldName]; !ok {
+				selectedFields = append(selectedFields, user.FieldName)
+				fieldSeen[user.FieldName] = struct{}{}
+			}
+		case "id":
+		case "__typename":
+		default:
+			unknownSeen = true
+		}
+	}
+	if !unknownSeen {
+		u.Select(selectedFields...)
+	}
 	return nil
 }
 
