@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"projectname/db/user"
+	"projectname/db/usergroup"
 
 	"entgo.io/contrib/entgql"
 	"entgo.io/ent"
@@ -338,5 +339,251 @@ func (u *User) ToEdge(order *UserOrder) *UserEdge {
 	return &UserEdge{
 		Node:   u,
 		Cursor: order.Field.toCursor(u),
+	}
+}
+
+// UserGroupEdge is the edge representation of UserGroup.
+type UserGroupEdge struct {
+	Node   *UserGroup `json:"node"`
+	Cursor Cursor     `json:"cursor"`
+}
+
+// UserGroupConnection is the connection containing edges to UserGroup.
+type UserGroupConnection struct {
+	Edges      []*UserGroupEdge `json:"edges"`
+	PageInfo   PageInfo         `json:"pageInfo"`
+	TotalCount int              `json:"totalCount"`
+}
+
+func (c *UserGroupConnection) build(nodes []*UserGroup, pager *usergroupPager, after *Cursor, first *int, before *Cursor, last *int) {
+	c.PageInfo.HasNextPage = before != nil
+	c.PageInfo.HasPreviousPage = after != nil
+	if first != nil && *first+1 == len(nodes) {
+		c.PageInfo.HasNextPage = true
+		nodes = nodes[:len(nodes)-1]
+	} else if last != nil && *last+1 == len(nodes) {
+		c.PageInfo.HasPreviousPage = true
+		nodes = nodes[:len(nodes)-1]
+	}
+	var nodeAt func(int) *UserGroup
+	if last != nil {
+		n := len(nodes) - 1
+		nodeAt = func(i int) *UserGroup {
+			return nodes[n-i]
+		}
+	} else {
+		nodeAt = func(i int) *UserGroup {
+			return nodes[i]
+		}
+	}
+	c.Edges = make([]*UserGroupEdge, len(nodes))
+	for i := range nodes {
+		node := nodeAt(i)
+		c.Edges[i] = &UserGroupEdge{
+			Node:   node,
+			Cursor: pager.toCursor(node),
+		}
+	}
+	if l := len(c.Edges); l > 0 {
+		c.PageInfo.StartCursor = &c.Edges[0].Cursor
+		c.PageInfo.EndCursor = &c.Edges[l-1].Cursor
+	}
+	if c.TotalCount == 0 {
+		c.TotalCount = len(nodes)
+	}
+}
+
+// UserGroupPaginateOption enables pagination customization.
+type UserGroupPaginateOption func(*usergroupPager) error
+
+// WithUserGroupOrder configures pagination ordering.
+func WithUserGroupOrder(order *UserGroupOrder) UserGroupPaginateOption {
+	if order == nil {
+		order = DefaultUserGroupOrder
+	}
+	o := *order
+	return func(pager *usergroupPager) error {
+		if err := o.Direction.Validate(); err != nil {
+			return err
+		}
+		if o.Field == nil {
+			o.Field = DefaultUserGroupOrder.Field
+		}
+		pager.order = &o
+		return nil
+	}
+}
+
+// WithUserGroupFilter configures pagination filter.
+func WithUserGroupFilter(filter func(*UserGroupQuery) (*UserGroupQuery, error)) UserGroupPaginateOption {
+	return func(pager *usergroupPager) error {
+		if filter == nil {
+			return errors.New("UserGroupQuery filter cannot be nil")
+		}
+		pager.filter = filter
+		return nil
+	}
+}
+
+type usergroupPager struct {
+	reverse bool
+	order   *UserGroupOrder
+	filter  func(*UserGroupQuery) (*UserGroupQuery, error)
+}
+
+func newUserGroupPager(opts []UserGroupPaginateOption, reverse bool) (*usergroupPager, error) {
+	pager := &usergroupPager{reverse: reverse}
+	for _, opt := range opts {
+		if err := opt(pager); err != nil {
+			return nil, err
+		}
+	}
+	if pager.order == nil {
+		pager.order = DefaultUserGroupOrder
+	}
+	return pager, nil
+}
+
+func (p *usergroupPager) applyFilter(query *UserGroupQuery) (*UserGroupQuery, error) {
+	if p.filter != nil {
+		return p.filter(query)
+	}
+	return query, nil
+}
+
+func (p *usergroupPager) toCursor(ug *UserGroup) Cursor {
+	return p.order.Field.toCursor(ug)
+}
+
+func (p *usergroupPager) applyCursors(query *UserGroupQuery, after, before *Cursor) (*UserGroupQuery, error) {
+	direction := p.order.Direction
+	if p.reverse {
+		direction = direction.Reverse()
+	}
+	for _, predicate := range entgql.CursorsPredicate(after, before, DefaultUserGroupOrder.Field.column, p.order.Field.column, direction) {
+		query = query.Where(predicate)
+	}
+	return query, nil
+}
+
+func (p *usergroupPager) applyOrder(query *UserGroupQuery) *UserGroupQuery {
+	direction := p.order.Direction
+	if p.reverse {
+		direction = direction.Reverse()
+	}
+	query = query.Order(p.order.Field.toTerm(direction.OrderTermOption()))
+	if p.order.Field != DefaultUserGroupOrder.Field {
+		query = query.Order(DefaultUserGroupOrder.Field.toTerm(direction.OrderTermOption()))
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(p.order.Field.column)
+	}
+	return query
+}
+
+func (p *usergroupPager) orderExpr(query *UserGroupQuery) sql.Querier {
+	direction := p.order.Direction
+	if p.reverse {
+		direction = direction.Reverse()
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(p.order.Field.column)
+	}
+	return sql.ExprFunc(func(b *sql.Builder) {
+		b.Ident(p.order.Field.column).Pad().WriteString(string(direction))
+		if p.order.Field != DefaultUserGroupOrder.Field {
+			b.Comma().Ident(DefaultUserGroupOrder.Field.column).Pad().WriteString(string(direction))
+		}
+	})
+}
+
+// Paginate executes the query and returns a relay based cursor connection to UserGroup.
+func (ug *UserGroupQuery) Paginate(
+	ctx context.Context, after *Cursor, first *int,
+	before *Cursor, last *int, opts ...UserGroupPaginateOption,
+) (*UserGroupConnection, error) {
+	if err := validateFirstLast(first, last); err != nil {
+		return nil, err
+	}
+	pager, err := newUserGroupPager(opts, last != nil)
+	if err != nil {
+		return nil, err
+	}
+	if ug, err = pager.applyFilter(ug); err != nil {
+		return nil, err
+	}
+	conn := &UserGroupConnection{Edges: []*UserGroupEdge{}}
+	ignoredEdges := !hasCollectedField(ctx, edgesField)
+	if hasCollectedField(ctx, totalCountField) || hasCollectedField(ctx, pageInfoField) {
+		hasPagination := after != nil || first != nil || before != nil || last != nil
+		if hasPagination || ignoredEdges {
+			if conn.TotalCount, err = ug.Clone().Count(ctx); err != nil {
+				return nil, err
+			}
+			conn.PageInfo.HasNextPage = first != nil && conn.TotalCount > 0
+			conn.PageInfo.HasPreviousPage = last != nil && conn.TotalCount > 0
+		}
+	}
+	if ignoredEdges || (first != nil && *first == 0) || (last != nil && *last == 0) {
+		return conn, nil
+	}
+	if ug, err = pager.applyCursors(ug, after, before); err != nil {
+		return nil, err
+	}
+	if limit := paginateLimit(first, last); limit != 0 {
+		ug.Limit(limit)
+	}
+	if field := collectedField(ctx, edgesField, nodeField); field != nil {
+		if err := ug.collectField(ctx, graphql.GetOperationContext(ctx), *field, []string{edgesField, nodeField}); err != nil {
+			return nil, err
+		}
+	}
+	ug = pager.applyOrder(ug)
+	nodes, err := ug.All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	conn.build(nodes, pager, after, first, before, last)
+	return conn, nil
+}
+
+// UserGroupOrderField defines the ordering field of UserGroup.
+type UserGroupOrderField struct {
+	// Value extracts the ordering value from the given UserGroup.
+	Value    func(*UserGroup) (ent.Value, error)
+	column   string // field or computed.
+	toTerm   func(...sql.OrderTermOption) usergroup.OrderOption
+	toCursor func(*UserGroup) Cursor
+}
+
+// UserGroupOrder defines the ordering of UserGroup.
+type UserGroupOrder struct {
+	Direction OrderDirection       `json:"direction"`
+	Field     *UserGroupOrderField `json:"field"`
+}
+
+// DefaultUserGroupOrder is the default ordering of UserGroup.
+var DefaultUserGroupOrder = &UserGroupOrder{
+	Direction: entgql.OrderDirectionAsc,
+	Field: &UserGroupOrderField{
+		Value: func(ug *UserGroup) (ent.Value, error) {
+			return ug.ID, nil
+		},
+		column: usergroup.FieldID,
+		toTerm: usergroup.ByID,
+		toCursor: func(ug *UserGroup) Cursor {
+			return Cursor{ID: ug.ID}
+		},
+	},
+}
+
+// ToEdge converts UserGroup into UserGroupEdge.
+func (ug *UserGroup) ToEdge(order *UserGroupOrder) *UserGroupEdge {
+	if order == nil {
+		order = DefaultUserGroupOrder
+	}
+	return &UserGroupEdge{
+		Node:   ug,
+		Cursor: order.Field.toCursor(ug),
 	}
 }

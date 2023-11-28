@@ -4,10 +4,12 @@ package db
 
 import (
 	"context"
+	"database/sql/driver"
 	"fmt"
 	"math"
 	"projectname/db/predicate"
 	"projectname/db/user"
+	"projectname/db/usergroup"
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
@@ -17,12 +19,18 @@ import (
 // UserQuery is the builder for querying User entities.
 type UserQuery struct {
 	config
-	ctx        *QueryContext
-	order      []user.OrderOption
-	inters     []Interceptor
-	predicates []predicate.User
-	modifiers  []func(*sql.Selector)
-	loadTotal  []func(context.Context, []*User) error
+	ctx                  *QueryContext
+	order                []user.OrderOption
+	inters               []Interceptor
+	predicates           []predicate.User
+	withFriends          *UserQuery
+	withBestFriend       *UserQuery
+	withAdminGroups      *UserGroupQuery
+	withFKs              bool
+	modifiers            []func(*sql.Selector)
+	loadTotal            []func(context.Context, []*User) error
+	withNamedFriends     map[string]*UserQuery
+	withNamedAdminGroups map[string]*UserGroupQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -57,6 +65,72 @@ func (uq *UserQuery) Unique(unique bool) *UserQuery {
 func (uq *UserQuery) Order(o ...user.OrderOption) *UserQuery {
 	uq.order = append(uq.order, o...)
 	return uq
+}
+
+// QueryFriends chains the current query on the "friends" edge.
+func (uq *UserQuery) QueryFriends() *UserQuery {
+	query := (&UserClient{config: uq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := uq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := uq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(user.Table, user.FieldID, selector),
+			sqlgraph.To(user.Table, user.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, true, user.FriendsTable, user.FriendsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(uq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryBestFriend chains the current query on the "bestFriend" edge.
+func (uq *UserQuery) QueryBestFriend() *UserQuery {
+	query := (&UserClient{config: uq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := uq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := uq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(user.Table, user.FieldID, selector),
+			sqlgraph.To(user.Table, user.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, user.BestFriendTable, user.BestFriendColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(uq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryAdminGroups chains the current query on the "adminGroups" edge.
+func (uq *UserQuery) QueryAdminGroups() *UserGroupQuery {
+	query := (&UserGroupClient{config: uq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := uq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := uq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(user.Table, user.FieldID, selector),
+			sqlgraph.To(usergroup.Table, usergroup.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, true, user.AdminGroupsTable, user.AdminGroupsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(uq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
 }
 
 // First returns the first User entity from the query.
@@ -246,15 +320,51 @@ func (uq *UserQuery) Clone() *UserQuery {
 		return nil
 	}
 	return &UserQuery{
-		config:     uq.config,
-		ctx:        uq.ctx.Clone(),
-		order:      append([]user.OrderOption{}, uq.order...),
-		inters:     append([]Interceptor{}, uq.inters...),
-		predicates: append([]predicate.User{}, uq.predicates...),
+		config:          uq.config,
+		ctx:             uq.ctx.Clone(),
+		order:           append([]user.OrderOption{}, uq.order...),
+		inters:          append([]Interceptor{}, uq.inters...),
+		predicates:      append([]predicate.User{}, uq.predicates...),
+		withFriends:     uq.withFriends.Clone(),
+		withBestFriend:  uq.withBestFriend.Clone(),
+		withAdminGroups: uq.withAdminGroups.Clone(),
 		// clone intermediate query.
 		sql:  uq.sql.Clone(),
 		path: uq.path,
 	}
+}
+
+// WithFriends tells the query-builder to eager-load the nodes that are connected to
+// the "friends" edge. The optional arguments are used to configure the query builder of the edge.
+func (uq *UserQuery) WithFriends(opts ...func(*UserQuery)) *UserQuery {
+	query := (&UserClient{config: uq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	uq.withFriends = query
+	return uq
+}
+
+// WithBestFriend tells the query-builder to eager-load the nodes that are connected to
+// the "bestFriend" edge. The optional arguments are used to configure the query builder of the edge.
+func (uq *UserQuery) WithBestFriend(opts ...func(*UserQuery)) *UserQuery {
+	query := (&UserClient{config: uq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	uq.withBestFriend = query
+	return uq
+}
+
+// WithAdminGroups tells the query-builder to eager-load the nodes that are connected to
+// the "adminGroups" edge. The optional arguments are used to configure the query builder of the edge.
+func (uq *UserQuery) WithAdminGroups(opts ...func(*UserGroupQuery)) *UserQuery {
+	query := (&UserGroupClient{config: uq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	uq.withAdminGroups = query
+	return uq
 }
 
 // GroupBy is used to group vertices by one or more fields/columns.
@@ -333,15 +443,28 @@ func (uq *UserQuery) prepareQuery(ctx context.Context) error {
 
 func (uq *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, error) {
 	var (
-		nodes = []*User{}
-		_spec = uq.querySpec()
+		nodes       = []*User{}
+		withFKs     = uq.withFKs
+		_spec       = uq.querySpec()
+		loadedTypes = [3]bool{
+			uq.withFriends != nil,
+			uq.withBestFriend != nil,
+			uq.withAdminGroups != nil,
+		}
 	)
+	if uq.withBestFriend != nil {
+		withFKs = true
+	}
+	if withFKs {
+		_spec.Node.Columns = append(_spec.Node.Columns, user.ForeignKeys...)
+	}
 	_spec.ScanValues = func(columns []string) ([]any, error) {
 		return (*User).scanValues(nil, columns)
 	}
 	_spec.Assign = func(columns []string, values []any) error {
 		node := &User{config: uq.config}
 		nodes = append(nodes, node)
+		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
 	}
 	if len(uq.modifiers) > 0 {
@@ -356,12 +479,141 @@ func (uq *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
+	if query := uq.withFriends; query != nil {
+		if err := uq.loadFriends(ctx, query, nodes,
+			func(n *User) { n.Edges.Friends = []*User{} },
+			func(n *User, e *User) { n.Edges.Friends = append(n.Edges.Friends, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := uq.withBestFriend; query != nil {
+		if err := uq.loadBestFriend(ctx, query, nodes, nil,
+			func(n *User, e *User) { n.Edges.BestFriend = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := uq.withAdminGroups; query != nil {
+		if err := uq.loadAdminGroups(ctx, query, nodes,
+			func(n *User) { n.Edges.AdminGroups = []*UserGroup{} },
+			func(n *User, e *UserGroup) { n.Edges.AdminGroups = append(n.Edges.AdminGroups, e) }); err != nil {
+			return nil, err
+		}
+	}
+	for name, query := range uq.withNamedFriends {
+		if err := uq.loadFriends(ctx, query, nodes,
+			func(n *User) { n.appendNamedFriends(name) },
+			func(n *User, e *User) { n.appendNamedFriends(name, e) }); err != nil {
+			return nil, err
+		}
+	}
+	for name, query := range uq.withNamedAdminGroups {
+		if err := uq.loadAdminGroups(ctx, query, nodes,
+			func(n *User) { n.appendNamedAdminGroups(name) },
+			func(n *User, e *UserGroup) { n.appendNamedAdminGroups(name, e) }); err != nil {
+			return nil, err
+		}
+	}
 	for i := range uq.loadTotal {
 		if err := uq.loadTotal[i](ctx, nodes); err != nil {
 			return nil, err
 		}
 	}
 	return nodes, nil
+}
+
+func (uq *UserQuery) loadFriends(ctx context.Context, query *UserQuery, nodes []*User, init func(*User), assign func(*User, *User)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*User)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	query.withFKs = true
+	query.Where(predicate.User(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(user.FriendsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.user_best_friend
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "user_best_friend" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "user_best_friend" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (uq *UserQuery) loadBestFriend(ctx context.Context, query *UserQuery, nodes []*User, init func(*User), assign func(*User, *User)) error {
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*User)
+	for i := range nodes {
+		if nodes[i].user_best_friend == nil {
+			continue
+		}
+		fk := *nodes[i].user_best_friend
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(user.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "user_best_friend" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
+func (uq *UserQuery) loadAdminGroups(ctx context.Context, query *UserGroupQuery, nodes []*User, init func(*User), assign func(*User, *UserGroup)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*User)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	query.withFKs = true
+	query.Where(predicate.UserGroup(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(user.AdminGroupsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.user_group_admin
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "user_group_admin" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "user_group_admin" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
 }
 
 func (uq *UserQuery) sqlCount(ctx context.Context) (int, error) {
@@ -446,6 +698,34 @@ func (uq *UserQuery) sqlQuery(ctx context.Context) *sql.Selector {
 		selector.Limit(*limit)
 	}
 	return selector
+}
+
+// WithNamedFriends tells the query-builder to eager-load the nodes that are connected to the "friends"
+// edge with the given name. The optional arguments are used to configure the query builder of the edge.
+func (uq *UserQuery) WithNamedFriends(name string, opts ...func(*UserQuery)) *UserQuery {
+	query := (&UserClient{config: uq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	if uq.withNamedFriends == nil {
+		uq.withNamedFriends = make(map[string]*UserQuery)
+	}
+	uq.withNamedFriends[name] = query
+	return uq
+}
+
+// WithNamedAdminGroups tells the query-builder to eager-load the nodes that are connected to the "adminGroups"
+// edge with the given name. The optional arguments are used to configure the query builder of the edge.
+func (uq *UserQuery) WithNamedAdminGroups(name string, opts ...func(*UserGroupQuery)) *UserQuery {
+	query := (&UserGroupClient{config: uq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	if uq.withNamedAdminGroups == nil {
+		uq.withNamedAdminGroups = make(map[string]*UserGroupQuery)
+	}
+	uq.withNamedAdminGroups[name] = query
+	return uq
 }
 
 // UserGroupBy is the group-by builder for User entities.

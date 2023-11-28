@@ -8,6 +8,7 @@ import (
 	"projectname/db"
 	"projectname/db/predicate"
 	"projectname/db/user"
+	"projectname/db/usergroup"
 
 	"entgo.io/ent/dialect/sql"
 )
@@ -95,11 +96,40 @@ func (f TraverseUser) Traverse(ctx context.Context, q db.Query) error {
 	return fmt.Errorf("unexpected query type %T. expect *db.UserQuery", q)
 }
 
+// The UserGroupFunc type is an adapter to allow the use of ordinary function as a Querier.
+type UserGroupFunc func(context.Context, *db.UserGroupQuery) (db.Value, error)
+
+// Query calls f(ctx, q).
+func (f UserGroupFunc) Query(ctx context.Context, q db.Query) (db.Value, error) {
+	if q, ok := q.(*db.UserGroupQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *db.UserGroupQuery", q)
+}
+
+// The TraverseUserGroup type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseUserGroup func(context.Context, *db.UserGroupQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseUserGroup) Intercept(next db.Querier) db.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseUserGroup) Traverse(ctx context.Context, q db.Query) error {
+	if q, ok := q.(*db.UserGroupQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *db.UserGroupQuery", q)
+}
+
 // NewQuery returns the generic Query interface for the given typed query.
 func NewQuery(q db.Query) (Query, error) {
 	switch q := q.(type) {
 	case *db.UserQuery:
 		return &query[*db.UserQuery, predicate.User, user.OrderOption]{typ: db.TypeUser, tq: q}, nil
+	case *db.UserGroupQuery:
+		return &query[*db.UserGroupQuery, predicate.UserGroup, usergroup.OrderOption]{typ: db.TypeUserGroup, tq: q}, nil
 	default:
 		return nil, fmt.Errorf("unknown query type %T", q)
 	}

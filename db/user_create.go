@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"projectname/db/user"
+	"projectname/db/usergroup"
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
@@ -25,6 +26,47 @@ type UserCreate struct {
 func (uc *UserCreate) SetName(s string) *UserCreate {
 	uc.mutation.SetName(s)
 	return uc
+}
+
+// AddFriendIDs adds the "friends" edge to the User entity by IDs.
+func (uc *UserCreate) AddFriendIDs(ids ...int) *UserCreate {
+	uc.mutation.AddFriendIDs(ids...)
+	return uc
+}
+
+// AddFriends adds the "friends" edges to the User entity.
+func (uc *UserCreate) AddFriends(u ...*User) *UserCreate {
+	ids := make([]int, len(u))
+	for i := range u {
+		ids[i] = u[i].ID
+	}
+	return uc.AddFriendIDs(ids...)
+}
+
+// SetBestFriendID sets the "bestFriend" edge to the User entity by ID.
+func (uc *UserCreate) SetBestFriendID(id int) *UserCreate {
+	uc.mutation.SetBestFriendID(id)
+	return uc
+}
+
+// SetBestFriend sets the "bestFriend" edge to the User entity.
+func (uc *UserCreate) SetBestFriend(u *User) *UserCreate {
+	return uc.SetBestFriendID(u.ID)
+}
+
+// AddAdminGroupIDs adds the "adminGroups" edge to the UserGroup entity by IDs.
+func (uc *UserCreate) AddAdminGroupIDs(ids ...int) *UserCreate {
+	uc.mutation.AddAdminGroupIDs(ids...)
+	return uc
+}
+
+// AddAdminGroups adds the "adminGroups" edges to the UserGroup entity.
+func (uc *UserCreate) AddAdminGroups(u ...*UserGroup) *UserCreate {
+	ids := make([]int, len(u))
+	for i := range u {
+		ids[i] = u[i].ID
+	}
+	return uc.AddAdminGroupIDs(ids...)
 }
 
 // Mutation returns the UserMutation object of the builder.
@@ -69,6 +111,9 @@ func (uc *UserCreate) check() error {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`db: validator failed for field "User.name": %w`, err)}
 		}
 	}
+	if _, ok := uc.mutation.BestFriendID(); !ok {
+		return &ValidationError{Name: "bestFriend", err: errors.New(`db: missing required edge "User.bestFriend"`)}
+	}
 	return nil
 }
 
@@ -99,6 +144,55 @@ func (uc *UserCreate) createSpec() (*User, *sqlgraph.CreateSpec) {
 	if value, ok := uc.mutation.Name(); ok {
 		_spec.SetField(user.FieldName, field.TypeString, value)
 		_node.Name = value
+	}
+	if nodes := uc.mutation.FriendsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   user.FriendsTable,
+			Columns: []string{user.FriendsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(user.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := uc.mutation.BestFriendIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   user.BestFriendTable,
+			Columns: []string{user.BestFriendColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(user.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.user_best_friend = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := uc.mutation.AdminGroupsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   user.AdminGroupsTable,
+			Columns: []string{user.AdminGroupsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(usergroup.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec
 }

@@ -6,8 +6,10 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"projectname/db"
 	"sync/atomic"
 
+	"entgo.io/contrib/entgql"
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/introspection"
 	gqlparser "github.com/vektah/gqlparser/v2"
@@ -47,13 +49,46 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		Node  func(childComplexity int, id string) int
-		Nodes func(childComplexity int, ids []string) int
+		Node       func(childComplexity int, id string) int
+		Nodes      func(childComplexity int, ids []string) int
+		UserGroups func(childComplexity int, after *entgql.Cursor[int], first *int, before *entgql.Cursor[int], last *int, where *db.UserGroupWhereInput) int
+		Users      func(childComplexity int, after *entgql.Cursor[int], first *int, before *entgql.Cursor[int], last *int, where *db.UserWhereInput) int
 	}
 
 	User struct {
-		ID   func(childComplexity int) int
-		Name func(childComplexity int) int
+		AdminGroups func(childComplexity int, after *entgql.Cursor[int], first *int, before *entgql.Cursor[int], last *int, where *db.UserGroupWhereInput) int
+		BestFriend  func(childComplexity int) int
+		Friends     func(childComplexity int) int
+		ID          func(childComplexity int) int
+		Name        func(childComplexity int) int
+	}
+
+	UserConnection struct {
+		Edges      func(childComplexity int) int
+		PageInfo   func(childComplexity int) int
+		TotalCount func(childComplexity int) int
+	}
+
+	UserEdge struct {
+		Cursor func(childComplexity int) int
+		Node   func(childComplexity int) int
+	}
+
+	UserGroup struct {
+		Admin func(childComplexity int) int
+		ID    func(childComplexity int) int
+		Name  func(childComplexity int) int
+	}
+
+	UserGroupConnection struct {
+		Edges      func(childComplexity int) int
+		PageInfo   func(childComplexity int) int
+		TotalCount func(childComplexity int) int
+	}
+
+	UserGroupEdge struct {
+		Cursor func(childComplexity int) int
+		Node   func(childComplexity int) int
 	}
 }
 
@@ -128,6 +163,56 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.Nodes(childComplexity, args["ids"].([]string)), true
 
+	case "Query.userGroups":
+		if e.complexity.Query.UserGroups == nil {
+			break
+		}
+
+		args, err := ec.field_Query_userGroups_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.UserGroups(childComplexity, args["after"].(*entgql.Cursor[int]), args["first"].(*int), args["before"].(*entgql.Cursor[int]), args["last"].(*int), args["where"].(*db.UserGroupWhereInput)), true
+
+	case "Query.users":
+		if e.complexity.Query.Users == nil {
+			break
+		}
+
+		args, err := ec.field_Query_users_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.Users(childComplexity, args["after"].(*entgql.Cursor[int]), args["first"].(*int), args["before"].(*entgql.Cursor[int]), args["last"].(*int), args["where"].(*db.UserWhereInput)), true
+
+	case "User.adminGroups":
+		if e.complexity.User.AdminGroups == nil {
+			break
+		}
+
+		args, err := ec.field_User_adminGroups_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.User.AdminGroups(childComplexity, args["after"].(*entgql.Cursor[int]), args["first"].(*int), args["before"].(*entgql.Cursor[int]), args["last"].(*int), args["where"].(*db.UserGroupWhereInput)), true
+
+	case "User.bestfriend":
+		if e.complexity.User.BestFriend == nil {
+			break
+		}
+
+		return e.complexity.User.BestFriend(childComplexity), true
+
+	case "User.friends":
+		if e.complexity.User.Friends == nil {
+			break
+		}
+
+		return e.complexity.User.Friends(childComplexity), true
+
 	case "User.id":
 		if e.complexity.User.ID == nil {
 			break
@@ -142,6 +227,97 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.User.Name(childComplexity), true
 
+	case "UserConnection.edges":
+		if e.complexity.UserConnection.Edges == nil {
+			break
+		}
+
+		return e.complexity.UserConnection.Edges(childComplexity), true
+
+	case "UserConnection.pageInfo":
+		if e.complexity.UserConnection.PageInfo == nil {
+			break
+		}
+
+		return e.complexity.UserConnection.PageInfo(childComplexity), true
+
+	case "UserConnection.totalCount":
+		if e.complexity.UserConnection.TotalCount == nil {
+			break
+		}
+
+		return e.complexity.UserConnection.TotalCount(childComplexity), true
+
+	case "UserEdge.cursor":
+		if e.complexity.UserEdge.Cursor == nil {
+			break
+		}
+
+		return e.complexity.UserEdge.Cursor(childComplexity), true
+
+	case "UserEdge.node":
+		if e.complexity.UserEdge.Node == nil {
+			break
+		}
+
+		return e.complexity.UserEdge.Node(childComplexity), true
+
+	case "UserGroup.admin":
+		if e.complexity.UserGroup.Admin == nil {
+			break
+		}
+
+		return e.complexity.UserGroup.Admin(childComplexity), true
+
+	case "UserGroup.id":
+		if e.complexity.UserGroup.ID == nil {
+			break
+		}
+
+		return e.complexity.UserGroup.ID(childComplexity), true
+
+	case "UserGroup.name":
+		if e.complexity.UserGroup.Name == nil {
+			break
+		}
+
+		return e.complexity.UserGroup.Name(childComplexity), true
+
+	case "UserGroupConnection.edges":
+		if e.complexity.UserGroupConnection.Edges == nil {
+			break
+		}
+
+		return e.complexity.UserGroupConnection.Edges(childComplexity), true
+
+	case "UserGroupConnection.pageInfo":
+		if e.complexity.UserGroupConnection.PageInfo == nil {
+			break
+		}
+
+		return e.complexity.UserGroupConnection.PageInfo(childComplexity), true
+
+	case "UserGroupConnection.totalCount":
+		if e.complexity.UserGroupConnection.TotalCount == nil {
+			break
+		}
+
+		return e.complexity.UserGroupConnection.TotalCount(childComplexity), true
+
+	case "UserGroupEdge.cursor":
+		if e.complexity.UserGroupEdge.Cursor == nil {
+			break
+		}
+
+		return e.complexity.UserGroupEdge.Cursor(childComplexity), true
+
+	case "UserGroupEdge.node":
+		if e.complexity.UserGroupEdge.Node == nil {
+			break
+		}
+
+		return e.complexity.UserGroupEdge.Node(childComplexity), true
+
 	}
 	return 0, false
 }
@@ -150,6 +326,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	rc := graphql.GetOperationContext(ctx)
 	ec := executionContext{rc, e, 0, 0, make(chan graphql.DeferredResult)}
 	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
+		ec.unmarshalInputUserGroupWhereInput,
 		ec.unmarshalInputUserWhereInput,
 	)
 	first := true
@@ -280,10 +457,132 @@ type Query {
     """The list of node IDs."""
     ids: [ID!]!
   ): [Node]!
+  users(
+    """Returns the elements in the list that come after the specified cursor."""
+    after: Cursor
+
+    """Returns the first _n_ elements from the list."""
+    first: Int
+
+    """Returns the elements in the list that come before the specified cursor."""
+    before: Cursor
+
+    """Returns the last _n_ elements from the list."""
+    last: Int
+
+    """Filtering options for Users returned from the connection."""
+    where: UserWhereInput
+  ): UserConnection!
+  userGroups(
+    """Returns the elements in the list that come after the specified cursor."""
+    after: Cursor
+
+    """Returns the first _n_ elements from the list."""
+    first: Int
+
+    """Returns the elements in the list that come before the specified cursor."""
+    before: Cursor
+
+    """Returns the last _n_ elements from the list."""
+    last: Int
+
+    """Filtering options for UserGroups returned from the connection."""
+    where: UserGroupWhereInput
+  ): UserGroupConnection!
 }
 type User implements Node {
   id: ID!
   name: String!
+  friends: [User!]
+  bestfriend: User! @goField(name: "BestFriend", forceResolver: false)
+  adminGroups(
+    """Returns the elements in the list that come after the specified cursor."""
+    after: Cursor
+
+    """Returns the first _n_ elements from the list."""
+    first: Int
+
+    """Returns the elements in the list that come before the specified cursor."""
+    before: Cursor
+
+    """Returns the last _n_ elements from the list."""
+    last: Int
+
+    """Filtering options for UserGroups returned from the connection."""
+    where: UserGroupWhereInput
+  ): UserGroupConnection!
+}
+"""A connection to a list of items."""
+type UserConnection {
+  """A list of edges."""
+  edges: [UserEdge]
+  """Information to aid in pagination."""
+  pageInfo: PageInfo!
+  """Identifies the total count of items in the connection."""
+  totalCount: Int!
+}
+"""An edge in a connection."""
+type UserEdge {
+  """The item at the end of the edge."""
+  node: User
+  """A cursor for use in pagination."""
+  cursor: Cursor!
+}
+type UserGroup implements Node {
+  id: ID!
+  name: String!
+  admin: User!
+}
+"""A connection to a list of items."""
+type UserGroupConnection {
+  """A list of edges."""
+  edges: [UserGroupEdge]
+  """Information to aid in pagination."""
+  pageInfo: PageInfo!
+  """Identifies the total count of items in the connection."""
+  totalCount: Int!
+}
+"""An edge in a connection."""
+type UserGroupEdge {
+  """The item at the end of the edge."""
+  node: UserGroup
+  """A cursor for use in pagination."""
+  cursor: Cursor!
+}
+"""
+UserGroupWhereInput is used for filtering UserGroup objects.
+Input was generated by ent.
+"""
+input UserGroupWhereInput {
+  not: UserGroupWhereInput
+  and: [UserGroupWhereInput!]
+  or: [UserGroupWhereInput!]
+  """id field predicates"""
+  id: ID
+  idNEQ: ID
+  idIn: [ID!]
+  idNotIn: [ID!]
+  idGT: ID
+  idGTE: ID
+  idLT: ID
+  idLTE: ID
+  """name field predicates"""
+  name: String
+  nameNEQ: String
+  nameIn: [String!]
+  nameNotIn: [String!]
+  nameGT: String
+  nameGTE: String
+  nameLT: String
+  nameLTE: String
+  nameContains: String
+  nameHasPrefix: String
+  nameHasSuffix: String
+  nameEqualFold: String
+  nameContainsFold: String
+  """admin edge predicates"""
+  hasAdmin: Boolean
+  hasAdminWith: [UserWhereInput!]
 }
 """
 UserWhereInput is used for filtering User objects.
@@ -316,6 +615,15 @@ input UserWhereInput {
   nameHasSuffix: String
   nameEqualFold: String
   nameContainsFold: String
+  """friends edge predicates"""
+  hasFriends: Boolean
+  hasFriendsWith: [UserWhereInput!]
+  """bestFriend edge predicates"""
+  hasBestFriend: Boolean
+  hasBestFriendWith: [UserWhereInput!]
+  """adminGroups edge predicates"""
+  hasAdminGroups: Boolean
+  hasAdminGroupsWith: [UserGroupWhereInput!]
 }
 `, BuiltIn: false},
 }

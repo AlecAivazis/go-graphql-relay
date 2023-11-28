@@ -10,9 +10,10 @@ import (
 
 func main() {
 	ex, err := entgql.NewExtension(
-		entgql.WithSchemaPath("./api/schema/generated_ent.graphql"),
 		entgql.WithWhereInputs(true),
+		entgql.WithConfigPath("./gqlgen.yml"),
 		entgql.WithSchemaGenerator(),
+		entgql.WithSchemaPath("./api/schema/generated_ent.graphql"),
 	)
 	if err != nil {
 		log.Fatalf("creating entgql extension: %v", err)

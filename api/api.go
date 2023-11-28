@@ -11,7 +11,7 @@ import (
 // NewSchema creates a new instance of the schema
 func NewSchema(client *db.Client) graphql.ExecutableSchema {
 	return runtime.NewExecutableSchema(runtime.Config{
-		Resolvers:  &resolver{},
+		Resolvers:  &resolver{client: client},
 		Directives: runtime.DirectiveRoot{},
 	})
 }

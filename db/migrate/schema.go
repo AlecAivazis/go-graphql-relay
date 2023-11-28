@@ -12,18 +12,50 @@ var (
 	UsersColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "name", Type: field.TypeString, Unique: true},
+		{Name: "user_best_friend", Type: field.TypeInt, Nullable: true},
 	}
 	// UsersTable holds the schema information for the "users" table.
 	UsersTable = &schema.Table{
 		Name:       "users",
 		Columns:    UsersColumns,
 		PrimaryKey: []*schema.Column{UsersColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "users_users_bestFriend",
+				Columns:    []*schema.Column{UsersColumns[2]},
+				RefColumns: []*schema.Column{UsersColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
+	}
+	// UserGroupsColumns holds the columns for the "user_groups" table.
+	UserGroupsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "name", Type: field.TypeString, Unique: true},
+		{Name: "user_group_admin", Type: field.TypeInt},
+	}
+	// UserGroupsTable holds the schema information for the "user_groups" table.
+	UserGroupsTable = &schema.Table{
+		Name:       "user_groups",
+		Columns:    UserGroupsColumns,
+		PrimaryKey: []*schema.Column{UserGroupsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "user_groups_users_admin",
+				Columns:    []*schema.Column{UserGroupsColumns[2]},
+				RefColumns: []*schema.Column{UsersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
 	}
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
 		UsersTable,
+		UserGroupsTable,
 	}
 )
 
 func init() {
+	UsersTable.ForeignKeys[0].RefTable = UsersTable
+	UserGroupsTable.ForeignKeys[0].RefTable = UsersTable
 }

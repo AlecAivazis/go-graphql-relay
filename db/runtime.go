@@ -5,6 +5,7 @@ package db
 import (
 	"projectname/db/schema"
 	"projectname/db/user"
+	"projectname/db/usergroup"
 )
 
 // The init function reads all schema descriptors with runtime code
@@ -17,4 +18,10 @@ func init() {
 	userDescName := userFields[0].Descriptor()
 	// user.NameValidator is a validator for the "name" field. It is called by the builders before save.
 	user.NameValidator = userDescName.Validators[0].(func(string) error)
+	usergroupFields := schema.UserGroup{}.Fields()
+	_ = usergroupFields
+	// usergroupDescName is the schema descriptor for name field.
+	usergroupDescName := usergroupFields[0].Descriptor()
+	// usergroup.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	usergroup.NameValidator = usergroupDescName.Validators[0].(func(string) error)
 }

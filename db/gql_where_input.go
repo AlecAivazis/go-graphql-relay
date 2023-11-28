@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"projectname/db/predicate"
 	"projectname/db/user"
+	"projectname/db/usergroup"
 )
 
 // UserWhereInput represents a where input for filtering User queries.
@@ -40,6 +41,18 @@ type UserWhereInput struct {
 	NameHasSuffix    *string  `json:"nameHasSuffix,omitempty"`
 	NameEqualFold    *string  `json:"nameEqualFold,omitempty"`
 	NameContainsFold *string  `json:"nameContainsFold,omitempty"`
+
+	// "friends" edge predicates.
+	HasFriends     *bool             `json:"hasFriends,omitempty"`
+	HasFriendsWith []*UserWhereInput `json:"hasFriendsWith,omitempty"`
+
+	// "bestFriend" edge predicates.
+	HasBestFriend     *bool             `json:"hasBestFriend,omitempty"`
+	HasBestFriendWith []*UserWhereInput `json:"hasBestFriendWith,omitempty"`
+
+	// "adminGroups" edge predicates.
+	HasAdminGroups     *bool                  `json:"hasAdminGroups,omitempty"`
+	HasAdminGroupsWith []*UserGroupWhereInput `json:"hasAdminGroupsWith,omitempty"`
 }
 
 // AddPredicates adds custom predicates to the where input to be used during the filtering phase.
@@ -177,6 +190,60 @@ func (i *UserWhereInput) P() (predicate.User, error) {
 		predicates = append(predicates, user.NameContainsFold(*i.NameContainsFold))
 	}
 
+	if i.HasFriends != nil {
+		p := user.HasFriends()
+		if !*i.HasFriends {
+			p = user.Not(p)
+		}
+		predicates = append(predicates, p)
+	}
+	if len(i.HasFriendsWith) > 0 {
+		with := make([]predicate.User, 0, len(i.HasFriendsWith))
+		for _, w := range i.HasFriendsWith {
+			p, err := w.P()
+			if err != nil {
+				return nil, fmt.Errorf("%w: field 'HasFriendsWith'", err)
+			}
+			with = append(with, p)
+		}
+		predicates = append(predicates, user.HasFriendsWith(with...))
+	}
+	if i.HasBestFriend != nil {
+		p := user.HasBestFriend()
+		if !*i.HasBestFriend {
+			p = user.Not(p)
+		}
+		predicates = append(predicates, p)
+	}
+	if len(i.HasBestFriendWith) > 0 {
+		with := make([]predicate.User, 0, len(i.HasBestFriendWith))
+		for _, w := range i.HasBestFriendWith {
+			p, err := w.P()
+			if err != nil {
+				return nil, fmt.Errorf("%w: field 'HasBestFriendWith'", err)
+			}
+			with = append(with, p)
+		}
+		predicates = append(predicates, user.HasBestFriendWith(with...))
+	}
+	if i.HasAdminGroups != nil {
+		p := user.HasAdminGroups()
+		if !*i.HasAdminGroups {
+			p = user.Not(p)
+		}
+		predicates = append(predicates, p)
+	}
+	if len(i.HasAdminGroupsWith) > 0 {
+		with := make([]predicate.UserGroup, 0, len(i.HasAdminGroupsWith))
+		for _, w := range i.HasAdminGroupsWith {
+			p, err := w.P()
+			if err != nil {
+				return nil, fmt.Errorf("%w: field 'HasAdminGroupsWith'", err)
+			}
+			with = append(with, p)
+		}
+		predicates = append(predicates, user.HasAdminGroupsWith(with...))
+	}
 	switch len(predicates) {
 	case 0:
 		return nil, ErrEmptyUserWhereInput
@@ -184,5 +251,205 @@ func (i *UserWhereInput) P() (predicate.User, error) {
 		return predicates[0], nil
 	default:
 		return user.And(predicates...), nil
+	}
+}
+
+// UserGroupWhereInput represents a where input for filtering UserGroup queries.
+type UserGroupWhereInput struct {
+	Predicates []predicate.UserGroup  `json:"-"`
+	Not        *UserGroupWhereInput   `json:"not,omitempty"`
+	Or         []*UserGroupWhereInput `json:"or,omitempty"`
+	And        []*UserGroupWhereInput `json:"and,omitempty"`
+
+	// "id" field predicates.
+	ID      *int  `json:"id,omitempty"`
+	IDNEQ   *int  `json:"idNEQ,omitempty"`
+	IDIn    []int `json:"idIn,omitempty"`
+	IDNotIn []int `json:"idNotIn,omitempty"`
+	IDGT    *int  `json:"idGT,omitempty"`
+	IDGTE   *int  `json:"idGTE,omitempty"`
+	IDLT    *int  `json:"idLT,omitempty"`
+	IDLTE   *int  `json:"idLTE,omitempty"`
+
+	// "name" field predicates.
+	Name             *string  `json:"name,omitempty"`
+	NameNEQ          *string  `json:"nameNEQ,omitempty"`
+	NameIn           []string `json:"nameIn,omitempty"`
+	NameNotIn        []string `json:"nameNotIn,omitempty"`
+	NameGT           *string  `json:"nameGT,omitempty"`
+	NameGTE          *string  `json:"nameGTE,omitempty"`
+	NameLT           *string  `json:"nameLT,omitempty"`
+	NameLTE          *string  `json:"nameLTE,omitempty"`
+	NameContains     *string  `json:"nameContains,omitempty"`
+	NameHasPrefix    *string  `json:"nameHasPrefix,omitempty"`
+	NameHasSuffix    *string  `json:"nameHasSuffix,omitempty"`
+	NameEqualFold    *string  `json:"nameEqualFold,omitempty"`
+	NameContainsFold *string  `json:"nameContainsFold,omitempty"`
+
+	// "admin" edge predicates.
+	HasAdmin     *bool             `json:"hasAdmin,omitempty"`
+	HasAdminWith []*UserWhereInput `json:"hasAdminWith,omitempty"`
+}
+
+// AddPredicates adds custom predicates to the where input to be used during the filtering phase.
+func (i *UserGroupWhereInput) AddPredicates(predicates ...predicate.UserGroup) {
+	i.Predicates = append(i.Predicates, predicates...)
+}
+
+// Filter applies the UserGroupWhereInput filter on the UserGroupQuery builder.
+func (i *UserGroupWhereInput) Filter(q *UserGroupQuery) (*UserGroupQuery, error) {
+	if i == nil {
+		return q, nil
+	}
+	p, err := i.P()
+	if err != nil {
+		if err == ErrEmptyUserGroupWhereInput {
+			return q, nil
+		}
+		return nil, err
+	}
+	return q.Where(p), nil
+}
+
+// ErrEmptyUserGroupWhereInput is returned in case the UserGroupWhereInput is empty.
+var ErrEmptyUserGroupWhereInput = errors.New("db: empty predicate UserGroupWhereInput")
+
+// P returns a predicate for filtering usergroups.
+// An error is returned if the input is empty or invalid.
+func (i *UserGroupWhereInput) P() (predicate.UserGroup, error) {
+	var predicates []predicate.UserGroup
+	if i.Not != nil {
+		p, err := i.Not.P()
+		if err != nil {
+			return nil, fmt.Errorf("%w: field 'not'", err)
+		}
+		predicates = append(predicates, usergroup.Not(p))
+	}
+	switch n := len(i.Or); {
+	case n == 1:
+		p, err := i.Or[0].P()
+		if err != nil {
+			return nil, fmt.Errorf("%w: field 'or'", err)
+		}
+		predicates = append(predicates, p)
+	case n > 1:
+		or := make([]predicate.UserGroup, 0, n)
+		for _, w := range i.Or {
+			p, err := w.P()
+			if err != nil {
+				return nil, fmt.Errorf("%w: field 'or'", err)
+			}
+			or = append(or, p)
+		}
+		predicates = append(predicates, usergroup.Or(or...))
+	}
+	switch n := len(i.And); {
+	case n == 1:
+		p, err := i.And[0].P()
+		if err != nil {
+			return nil, fmt.Errorf("%w: field 'and'", err)
+		}
+		predicates = append(predicates, p)
+	case n > 1:
+		and := make([]predicate.UserGroup, 0, n)
+		for _, w := range i.And {
+			p, err := w.P()
+			if err != nil {
+				return nil, fmt.Errorf("%w: field 'and'", err)
+			}
+			and = append(and, p)
+		}
+		predicates = append(predicates, usergroup.And(and...))
+	}
+	predicates = append(predicates, i.Predicates...)
+	if i.ID != nil {
+		predicates = append(predicates, usergroup.IDEQ(*i.ID))
+	}
+	if i.IDNEQ != nil {
+		predicates = append(predicates, usergroup.IDNEQ(*i.IDNEQ))
+	}
+	if len(i.IDIn) > 0 {
+		predicates = append(predicates, usergroup.IDIn(i.IDIn...))
+	}
+	if len(i.IDNotIn) > 0 {
+		predicates = append(predicates, usergroup.IDNotIn(i.IDNotIn...))
+	}
+	if i.IDGT != nil {
+		predicates = append(predicates, usergroup.IDGT(*i.IDGT))
+	}
+	if i.IDGTE != nil {
+		predicates = append(predicates, usergroup.IDGTE(*i.IDGTE))
+	}
+	if i.IDLT != nil {
+		predicates = append(predicates, usergroup.IDLT(*i.IDLT))
+	}
+	if i.IDLTE != nil {
+		predicates = append(predicates, usergroup.IDLTE(*i.IDLTE))
+	}
+	if i.Name != nil {
+		predicates = append(predicates, usergroup.NameEQ(*i.Name))
+	}
+	if i.NameNEQ != nil {
+		predicates = append(predicates, usergroup.NameNEQ(*i.NameNEQ))
+	}
+	if len(i.NameIn) > 0 {
+		predicates = append(predicates, usergroup.NameIn(i.NameIn...))
+	}
+	if len(i.NameNotIn) > 0 {
+		predicates = append(predicates, usergroup.NameNotIn(i.NameNotIn...))
+	}
+	if i.NameGT != nil {
+		predicates = append(predicates, usergroup.NameGT(*i.NameGT))
+	}
+	if i.NameGTE != nil {
+		predicates = append(predicates, usergroup.NameGTE(*i.NameGTE))
+	}
+	if i.NameLT != nil {
+		predicates = append(predicates, usergroup.NameLT(*i.NameLT))
+	}
+	if i.NameLTE != nil {
+		predicates = append(predicates, usergroup.NameLTE(*i.NameLTE))
+	}
+	if i.NameContains != nil {
+		predicates = append(predicates, usergroup.NameContains(*i.NameContains))
+	}
+	if i.NameHasPrefix != nil {
+		predicates = append(predicates, usergroup.NameHasPrefix(*i.NameHasPrefix))
+	}
+	if i.NameHasSuffix != nil {
+		predicates = append(predicates, usergroup.NameHasSuffix(*i.NameHasSuffix))
+	}
+	if i.NameEqualFold != nil {
+		predicates = append(predicates, usergroup.NameEqualFold(*i.NameEqualFold))
+	}
+	if i.NameContainsFold != nil {
+		predicates = append(predicates, usergroup.NameContainsFold(*i.NameContainsFold))
+	}
+
+	if i.HasAdmin != nil {
+		p := usergroup.HasAdmin()
+		if !*i.HasAdmin {
+			p = usergroup.Not(p)
+		}
+		predicates = append(predicates, p)
+	}
+	if len(i.HasAdminWith) > 0 {
+		with := make([]predicate.User, 0, len(i.HasAdminWith))
+		for _, w := range i.HasAdminWith {
+			p, err := w.P()
+			if err != nil {
+				return nil, fmt.Errorf("%w: field 'HasAdminWith'", err)
+			}
+			with = append(with, p)
+		}
+		predicates = append(predicates, usergroup.HasAdminWith(with...))
+	}
+	switch len(predicates) {
+	case 0:
+		return nil, ErrEmptyUserGroupWhereInput
+	case 1:
+		return predicates[0], nil
+	default:
+		return usergroup.And(predicates...), nil
 	}
 }
